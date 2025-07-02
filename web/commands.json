@@ -1,0 +1,27 @@
+[
+  {
+    "id": "1751416457529",
+    "trigger": "t",
+    "output": "stage.",
+    "description": "",
+    "cooldown": 10,
+    "enabled": true,
+    "permissions": "everyone",
+    "uses": 0,
+    "usage": [],
+    "createdAt": "2025-07-02T00:34:17.529Z",
+    "updatedAt": "2025-07-02T00:34:30.937Z"
+  },
+  {
+    "id": "1751416785492",
+    "trigger": "sayhello",
+    "output": "print \"hello\".",
+    "description": "prints hello",
+    "cooldown": 0,
+    "enabled": true,
+    "permissions": "everyone",
+    "uses": 0,
+    "usage": [],
+    "createdAt": "2025-07-02T00:39:45.492Z"
+  }
+]

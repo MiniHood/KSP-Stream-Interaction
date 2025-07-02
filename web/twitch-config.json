@@ -1,0 +1,13 @@
+{
+  "enabled": false,
+  "username": "",
+  "oauth": "",
+  "channels": [
+    ""
+  ],
+  "commandPrefix": "!",
+  "allowedUsers": [],
+  "autoConnect": true,
+  "logCommands": true,
+  "maxCommandLength": 100
+}

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCP Web Client with Twitch Integration</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>TCP Web Client with Twitch Integration</h1>
+        
+        <div class="status-section">
+            <h2>Connection Status</h2>
+            <div id="connection-status">Checking...</div>
+            <div class="button-group">
+                <button onclick="checkStatus()">Refresh Status</button>
+                <button onclick="reconnect()" class="reconnect-btn">Reconnect TCP</button>
+            </div>
+        </div>
+        
+        <div class="twitch-section">
+            <h2>Twitch Chat Integration</h2>
+            <div id="twitch-status">Checking...</div>
+            <div class="button-group">
+                <button onclick="checkTwitchStatus()">Refresh Twitch Status</button>
+                <button onclick="connectTwitch()" id="twitch-connect-btn" class="twitch-btn">Connect to Twitch</button>
+                <button onclick="disconnectTwitch()" id="twitch-disconnect-btn" class="twitch-btn" style="display: none;">Disconnect from Twitch</button>
+                <button onclick="showTwitchConfig()" class="config-btn">Configure Twitch</button>
+                <a href="commands.html" class="nav-link-btn">Manage Commands</a>
+            </div>
+            <div class="twitch-info">
+                <div id="twitch-channels"></div>
+                <div id="twitch-command-prefix"></div>
+            </div>
+        </div>
+        
+        <div class="send-section">
+            <h2>Send Message</h2>
+            <form id="message-form">
+                <input type="text" id="message-input" placeholder="Enter your message" required>
+                <button type="submit">Send via TCP</button>
+            </form>
+        </div>
+        
+        <div class="log-section">
+            <h2>Activity Log</h2>
+            <div class="log-tabs">
+                <button class="tab-btn active" onclick="switchTab('general')">General</button>
+                <button class="tab-btn" onclick="switchTab('twitch')">Twitch Commands</button>
+            </div>
+            <div id="log-output" class="log-content active"></div>
+            <div id="twitch-log-output" class="log-content"></div>
+            <button onclick="clearLog()" class="clear-btn">Clear Log</button>
+        </div>
+    </div>
+
+    <!-- Twitch Configuration Modal -->
+    <div id="twitch-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTwitchConfig()">&times;</span>
+            <h2>Twitch Configuration</h2>
+            <form id="twitch-config-form">
+                <div class="form-group">
+                    <label for="twitch-enabled">Enable Twitch Integration:</label>
+                    <input type="checkbox" id="twitch-enabled" name="enabled">
+                </div>
+                <div class="form-group">
+                    <label for="twitch-username">Bot Username:</label>
+                    <input type="text" id="twitch-username" name="username" placeholder="your_bot_username">
+                </div>
+                <div class="form-group">
+                    <label for="twitch-oauth">OAuth Token:</label>
+                    <input type="password" id="twitch-oauth" name="oauth" placeholder="oauth:your_oauth_token_here">
+                </div>
+                <div class="form-group">
+                    <label for="twitch-channels">Channels (comma-separated):</label>
+                    <input type="text" id="twitch-channels-input" name="channels" placeholder="channel1,channel2">
+                </div>
+                <div class="form-group">
+                    <label for="twitch-prefix">Command Prefix:</label>
+                    <input type="text" id="twitch-prefix" name="commandPrefix" placeholder="!">
+                </div>
+                <div class="form-group">
+                    <label for="twitch-allowed-users">Allowed Users (comma-separated, empty for all):</label>
+                    <input type="text" id="twitch-allowed-users" name="allowedUsers" placeholder="user1,user2">
+                </div>
+                <div class="form-group">
+                    <label for="twitch-auto-connect">Auto-connect on startup:</label>
+                    <input type="checkbox" id="twitch-auto-connect" name="autoConnect">
+                </div>
+                <div class="form-group">
+                    <label for="twitch-log-commands">Log commands:</label>
+                    <input type="checkbox" id="twitch-log-commands" name="logCommands">
+                </div>
+                <div class="form-group">
+                    <label for="twitch-max-length">Max Command Length:</label>
+                    <input type="number" id="twitch-max-length" name="maxCommandLength" min="1" max="500">
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="save-btn">Save Configuration</button>
+                    <button type="button" onclick="closeTwitchConfig()" class="cancel-btn">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Additional UI functionality
+        function checkStatus() {
+            getTCPStatus().then(status => {
+                const statusDiv = document.getElementById('connection-status');
+                if (status.connected) {
+                    statusDiv.innerHTML = `<span class="connected">Connected to ${status.remoteAddress}:${status.remotePort}</span>`;
+                } else {
+                    statusDiv.innerHTML = `<span class="disconnected">Disconnected (Destroyed: ${status.destroyed})</span>`;
+                }
+            }).catch(error => {
+                document.getElementById('connection-status').innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            });
+        }
+
+        async function checkTwitchStatus() {
+            try {
+                const status = await getTwitchStatus();
+                const statusDiv = document.getElementById('twitch-status');
+                const connectBtn = document.getElementById('twitch-connect-btn');
+                const disconnectBtn = document.getElementById('twitch-disconnect-btn');
+                const channelsDiv = document.getElementById('twitch-channels');
+                const prefixDiv = document.getElementById('twitch-command-prefix');
+                
+                if (status.enabled) {
+                    if (status.connected) {
+                        statusDiv.innerHTML = `<span class="connected">Connected to Twitch (${status.channels.join(', ')})</span>`;
+                        connectBtn.style.display = 'none';
+                        disconnectBtn.style.display = 'inline-block';
+                    } else {
+                        statusDiv.innerHTML = `<span class="disconnected">Twitch enabled but not connected</span>`;
+                        connectBtn.style.display = 'inline-block';
+                        disconnectBtn.style.display = 'none';
+                    }
+                    channelsDiv.innerHTML = `<strong>Channels:</strong> ${status.channels.join(', ')}`;
+                    prefixDiv.innerHTML = `<strong>Command Prefix:</strong> ${status.commandPrefix}`;
+                } else {
+                    statusDiv.innerHTML = `<span class="disabled">Twitch integration disabled</span>`;
+                    connectBtn.style.display = 'none';
+                    disconnectBtn.style.display = 'none';
+                    channelsDiv.innerHTML = '';
+                    prefixDiv.innerHTML = '';
+                }
+            } catch (error) {
+                document.getElementById('twitch-status').innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+
+        async function connectTwitch() {
+            addToLog('Connecting to Twitch...');
+            try {
+                const result = await connectTwitch();
+                addToLog(`Twitch: ${result.message}`);
+                checkTwitchStatus();
+            } catch (error) {
+                addToLog(`Twitch connect failed: ${error.message}`);
+            }
+        }
+
+        async function disconnectTwitch() {
+            addToLog('Disconnecting from Twitch...');
+            try {
+                const result = await disconnectTwitch();
+                addToLog(`Twitch: ${result.message}`);
+                checkTwitchStatus();
+            } catch (error) {
+                addToLog(`Twitch disconnect failed: ${error.message}`);
+            }
+        }
+
+        async function showTwitchConfig() {
+            try {
+                const config = await getTwitchConfig();
+                
+                // Populate form fields
+                document.getElementById('twitch-enabled').checked = config.enabled || false;
+                document.getElementById('twitch-username').value = config.username || '';
+                document.getElementById('twitch-oauth').value = config.oauth || '';
+                document.getElementById('twitch-channels-input').value = Array.isArray(config.channels) ? config.channels.join(',') : '';
+                document.getElementById('twitch-prefix').value = config.commandPrefix || '!';
+                document.getElementById('twitch-allowed-users').value = Array.isArray(config.allowedUsers) ? config.allowedUsers.join(',') : '';
+                document.getElementById('twitch-auto-connect').checked = config.autoConnect || false;
+                document.getElementById('twitch-log-commands').checked = config.logCommands || false;
+                document.getElementById('twitch-max-length').value = config.maxCommandLength || 100;
+                
+                document.getElementById('twitch-modal').style.display = 'block';
+            } catch (error) {
+                addToLog(`Failed to load Twitch config: ${error.message}`);
+            }
+        }
+
+        function closeTwitchConfig() {
+            document.getElementById('twitch-modal').style.display = 'none';
+        }
+
+        // Handle Twitch config form submission
+        document.getElementById('twitch-config-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const config = {
+                enabled: formData.get('enabled') === 'on',
+                username: formData.get('username'),
+                oauth: formData.get('oauth'),
+                channels: formData.get('channels').split(',').map(c => c.trim()).filter(c => c),
+                commandPrefix: formData.get('commandPrefix'),
+                allowedUsers: formData.get('allowedUsers').split(',').map(u => u.trim()).filter(u => u),
+                autoConnect: formData.get('autoConnect') === 'on',
+                logCommands: formData.get('logCommands') === 'on',
+                maxCommandLength: parseInt(formData.get('maxCommandLength')) || 100
+            };
+            
+            try {
+                const result = await updateTwitchConfig(config);
+                addToLog(`Twitch config updated: ${result.message}`);
+                closeTwitchConfig();
+                checkTwitchStatus();
+            } catch (error) {
+                addToLog(`Failed to update Twitch config: ${error.message}`);
+            }
+        });
+
+        function reconnect() {
+            addToLog('Attempting to reconnect TCP...');
+            reconnectTCP().then(result => {
+                addToLog(`Reconnect: ${result.message}`);
+                setTimeout(checkStatus, 1000);
+            }).catch(error => {
+                addToLog(`Reconnect failed: ${error.message}`);
+            });
+        }
+
+        function addToLog(message) {
+            const logDiv = document.getElementById('log-output');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function addToTwitchLog(message) {
+            const logDiv = document.getElementById('twitch-log-output');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log-output').innerHTML = '';
+            document.getElementById('twitch-log-output').innerHTML = '';
+        }
+
+        function switchTab(tabName) {
+            // Hide all log contents
+            document.querySelectorAll('.log-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            if (tabName === 'general') {
+                document.getElementById('log-output').classList.add('active');
+                document.querySelector('.tab-btn').classList.add('active');
+            } else if (tabName === 'twitch') {
+                document.getElementById('twitch-log-output').classList.add('active');
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('message-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const input = document.getElementById('message-input');
+            const message = input.value;
+            
+            if (message.trim()) {
+                addToLog(`Sending: ${message}`);
+                try {
+                    const result = await sendViaTCP(message);
+                    addToLog(`Result: ${result.message} (Bytes: ${result.bytesWritten})`);
+                    if (result.formattedMessage !== message) {
+                        addToLog(`Note: Message formatted as: "${result.formattedMessage.trim()}"`);
+                    }
+                    input.value = '';
+                } catch (error) {
+                    addToLog(`Error: ${error.message}`);
+                }
+            }
+        });
+
+        // Initial status checks
+        document.addEventListener('DOMContentLoaded', function() {
+            checkStatus();
+            checkTwitchStatus();
+            
+            // Load Twitch command history
+            getTwitchHistory().then(history => {
+                history.forEach(entry => {
+                    const timestamp = new Date(entry.timestamp).toLocaleTimeString();
+                    addToTwitchLog(`${entry.username}: ${entry.command}`);
+                });
+            }).catch(error => {
+                console.error('Failed to load Twitch history:', error);
+            });
+        });
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('twitch-modal');
+            if (event.target === modal) {
+                closeTwitchConfig();
+            }
+        }
+    </script>
+</body>
+</html>
